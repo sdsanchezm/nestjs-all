@@ -112,6 +112,9 @@ Select **ESM (ES Modules) [ with vitest ]**. That option is the default. It writ
 
 The CJS option generates a Jest project. This guide follows the ESM + Vitest starter, so leave the highlight on ESM and confirm it.
 
+- **NOTE:** with `"type": "module",` in the `package.json` file, will have to write .js file extension to each module - this is the **ESM (ES Modules)** option 
+- 
+
 ### 3.3 Wait for install
 
 The CLI installs dependencies and runs `git init` inside `my-app`. Pass `--skip-git` to skip the repository, or `--skip-install` to skip `npm install`.
