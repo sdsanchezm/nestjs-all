@@ -1,6 +1,8 @@
 import { ValidationPipe } from '@nestjs/common';
 import { NestFactory } from '@nestjs/core';
+
 import { AppModule } from './app.module';
+import { port } from './common/imports/application.imports';
 
 /**
  * Boots the HTTP server.
@@ -51,10 +53,11 @@ async function bootstrap() {
   );
 
   /**
-   * Opens port 3000 and keeps the process alive handling requests.
-   * The port is fixed here; the Mongo URL is fixed in `AppModule`.
+   * `port` reads `PORT` from the `ConfigService` that `ConfigModule` loaded
+   * from `.env`. The Mongo URL stays fixed in `AppModule`.
    */
-  await app.listen(3000);
+  await app.listen(port(app));
+  console.log(`Application is running on: ${await app.getUrl()}`);
 }
 
 bootstrap();

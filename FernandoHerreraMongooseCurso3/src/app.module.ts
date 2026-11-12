@@ -1,5 +1,6 @@
 import { join } from 'path';
 import { Module } from '@nestjs/common';
+import { ConfigModule } from '@nestjs/config';
 import { ServeStaticModule } from '@nestjs/serve-static';
 import { MongooseModule } from '@nestjs/mongoose';
 
@@ -17,6 +18,19 @@ import { CommonModule } from './common/common.module';
  */
 @Module({
   imports: [
+    /**
+     * Loads `.env` from the project root before the other modules start.
+     * `join(__dirname, '..', '.env')` resolves that file from the compiled
+     * output (`dist`), the same way the static folder path is built below.
+     *
+     * `isGlobal` registers `ConfigService` for the whole app, so `main.ts`
+     * can read `PORT` without importing this module again.
+     */
+    ConfigModule.forRoot({
+      isGlobal: true,
+      envFilePath: join(__dirname, '..', '.env'),
+    }),
+
     /**
      * Serves files from the `public` folder as static HTTP files.
      * `forRoot` is the one-time configuration of that feature for the whole app.

@@ -4,6 +4,13 @@ import { PokemonService } from './pokemon.service';
 import { PokemonController } from './pokemon.controller';
 import { Pokemon, PokemonSchema } from './entities/pokemon.entity';
 
+const MongooseModuleImport = MongooseModule.forFeature([
+  {
+    name: Pokemon.name,
+    schema: PokemonSchema,
+  },
+]);
+
 /**
  * Feature module for the Pokemon resource.
  *
@@ -22,13 +29,6 @@ import { Pokemon, PokemonSchema } from './entities/pokemon.entity';
 @Module({
   controllers: [PokemonController],
   providers: [PokemonService],
-  imports: [
-    MongooseModule.forFeature([
-      {
-        name: Pokemon.name,
-        schema: PokemonSchema,
-      },
-    ]),
-  ],
+  imports: [MongooseModuleImport],
 })
 export class PokemonModule {}
