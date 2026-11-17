@@ -2,8 +2,17 @@
 
 Step-by-step notes for creating a NestJS app with the official CLI. This guide uses the ESM starter, which ships with Vitest.
 
+## Related guides
+
+This file is the setup path. The other notes in this folder go further:
+
+- [CHEAT_SHEET_NEST.md](CHEAT_SHEET_NEST.md) — CLI commands, HTTP methods, validation, guards, interceptors, pipes, modules, and middleware.
+- [MASTERING_NESTJS.md](MASTERING_NESTJS.md) — NestJS mapped from C# / ASP.NET Core / Entity Framework: modules, dependency injection, the request pipeline, DTOs, persistence, testing, and the decorator catalog.
+- [MASTERING_NESTJS_ADVANCED.md](MASTERING_NESTJS_ADVANCED.md) — Prefix, versioning, and CORS, security defaults, list endpoints, production migrations, OpenAPI, outbound HTTP, cache, health checks, background work, and tests that replace a provider. Read it after [MASTERING_NESTJS.md](MASTERING_NESTJS.md).
+
 ## Contents
 
+- [Related guides](#related-guides)
 - [1. Prerequisites](#1-prerequisites)
 - [2. Install the Nest CLI](#2-install-the-nest-cli)
 - [3. Create a project](#3-create-a-project)
