@@ -1,71 +1,43 @@
-import { join } from 'path';
+// Root module. Nest boots from this class and follows its imports.
+// A module is a grouping: it tells Nest which controllers, services,
+// and other modules belong together. It does not handle requests itself.
+
+import { join } from 'path'; // Node helper that builds a filesystem path
 import { Module } from '@nestjs/common';
-import { ConfigModule } from '@nestjs/config';
 import { ServeStaticModule } from '@nestjs/serve-static';
 import { MongooseModule } from '@nestjs/mongoose';
 
 import { PokemonModule } from './pokemon/pokemon.module';
 import { CommonModule } from './common/common.module';
+import { SeedModule } from './seed/seed.module';
 
-/**
- * Root module. Nest starts here (see `main.ts`) and loads every module
- * listed in `imports`. This class has no controllers of its own: it composes
- * the application.
- *
- * `@Module` marks the class as a Nest module. The object passed to it is
- * the module's metadata. `imports` are other modules whose exported
- * providers this module may use.
- */
+// A decorator is a function written with @. Nest reads decorators
+// when the app starts and uses them as configuration.
+// @Module does not run on each request.
 @Module({
   imports: [
-    /**
-     * Loads `.env` from the project root before the other modules start.
-     * `join(__dirname, '..', '.env')` resolves that file from the compiled
-     * output (`dist`), the same way the static folder path is built below.
-     *
-     * `isGlobal` registers `ConfigService` for the whole app, so `main.ts`
-     * can read `PORT` without importing this module again.
-     */
-    ConfigModule.forRoot({
-      isGlobal: true,
-      envFilePath: join(__dirname, '..', '.env'),
-    }),
 
-    /**
-     * Serves files from the `public` folder as static HTTP files.
-     * `forRoot` is the one-time configuration of that feature for the whole app.
-     *
-     * `__dirname` is this file's compiled directory (`dist` when built).
-     * `join` walks up to the project root and into `public`, so `index.html`
-     * is available at `/` and does not go through the `api/v2` controllers.
-     * `join` comes from Node's `path` module and builds the path with the
-     * correct separator for the operating system.
-     */
+    // Serves files from the /public folder (HTML, CSS, images)
+    // without a controller method per file.
+    // __dirname is the folder of this file after compilation (dist/).
+    // '..' steps up to the project root, then into public/.
     ServeStaticModule.forRoot({
-      rootPath: join(__dirname, '..', 'public'),
+      rootPath: join(__dirname,'..','public'),
     }),
 
-    /**
-     * Opens the MongoDB connection used by every `@InjectModel` in the app.
-     * `forRoot` belongs on the root module and is called once.
-     * Feature modules then call `MongooseModule.forFeature` to register schemas
-     * on this same connection.
-     *
-     * The URL points at a local MongoDB. `nest-pokemon` is the database name;
-     * Mongo creates it on the first write.
-     */
+    // One database connection for the whole application.
+    // forRoot belongs in the root module. forFeature (in PokemonModule)
+    // later registers individual collections on this connection.
+    // The database name is the last segment: nest-pokemon.
     MongooseModule.forRoot('mongodb://localhost:27017/nest-pokemon'),
 
-    /**
-     * Feature module for the Pokemon resource: its controller, service, and schema.
-     */
+    // Feature modules. Importing them registers their routes and providers.
     PokemonModule,
 
-    /**
-     * Shared module. It is empty today and is imported so shared pieces
-     * (pipes, filters, guards) have a home as the app grows.
-     */
     CommonModule,
+
+    SeedModule,
+
   ],
 })
 export class AppModule {}

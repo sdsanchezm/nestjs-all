@@ -1,16 +1,13 @@
-import { Module } from '@nestjs/common';
+// Shared module with no routes. Its only job is to create AxiosAdapter
+// and make that instance available to other modules.
+// A provider is visible inside its own module. Other modules can inject
+// it only after this module lists it in exports and they import CommonModule.
 
-/**
- * Shared module.
- *
- * A module with empty metadata is still a valid module. Nest loads it because
- * `AppModule` imports it. Shared building blocks live in this folder so
- * feature modules can depend on one place later.
- *
- * `ParseMongoIdPipe` is used directly on a route parameter
- * (`@Param('id', ParseMongoIdPipe)`). Nest constructs that pipe itself.
- * The pipe has no constructor dependencies, so it does not need to be listed
- * in `providers` for that usage to work.
- */
-@Module({})
+import { Module } from '@nestjs/common';
+import { AxiosAdapter } from './adapters/axios.adapter';
+
+@Module({
+    providers: [ AxiosAdapter ],
+    exports: [ AxiosAdapter ]
+})
 export class CommonModule {}

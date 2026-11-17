@@ -1,48 +1,31 @@
-import {
-  ArgumentMetadata,
-  BadRequestException,
-  Injectable,
-  PipeTransform,
-} from '@nestjs/common';
+// A pipe runs on one argument before the controller method is called.
+// This pipe protects DELETE /api/v2/pokemon/:id.
+// If :id is not a MongoDB ObjectId (24 hex characters), the request
+// ends here with HTTP 400 and PokemonService.remove is never called.
+
+import { ArgumentMetadata, Injectable, PipeTransform, BadRequestException } from '@nestjs/common';
 import { isValidObjectId } from 'mongoose';
 
-/**
- * Pipe that accepts only a MongoDB ObjectId string.
- *
- * A pipe is a small class that runs on one handler argument before the
- * controller method does. It may transform the value or reject the request.
- *
- * `@Injectable()` lets Nest construct the class through dependency injection.
- * This pipe asks for nothing in its constructor, so Nest can create it from
- * the class reference on `@Param`.
- *
- * `PipeTransform<string, string>` documents the contract: the incoming value
- * is a string (a route param) and the returned value is a string too.
- * This pipe checks the value and passes the same string through.
- */
+// @Injectable() lets Nest construct this class. PipeTransform is the
+// interface every pipe implements: one transform() method.
 @Injectable()
-export class ParseMongoIdPipe implements PipeTransform<string, string> {
-  /**
-   * `value` is the raw route parameter.
-   * `metadata` describes where it came from:
-   * - `type`: `'param' | 'body' | 'query' | 'custom'`
-   * - `metatype`: the TypeScript type, here `String`
-   * - `data`: the name written in the decorator, here `'id'`
-   *
-   * `isValidObjectId` checks the shape (a 24-character hex string, or another
-   * form Mongoose accepts). It does not query the database. A well-formed id
-   * can still point at a missing document; `PokemonService.remove` handles that.
-   *
-   * Throwing `BadRequestException` stops the request and Nest responds with 400.
-   * The controller method is not called.
-   */
-  transform(value: string, metadata: ArgumentMetadata): string {
-    if (!isValidObjectId(value)) {
-      throw new BadRequestException(
-        `${value} is not a valid MongoID (${metadata.type}: ${String(metadata.data)})`,
-      );
+export class ParseMongoIdPipe implements PipeTransform {
+
+
+  // value is the raw :id string from the URL.
+  // metadata describes where it came from (param, query, or body) and its name.
+  // The interface requires the second parameter even though we only use value.
+  transform(value: string, metadata: ArgumentMetadata) {
+    // console.log({ value, metadata });
+
+    if ( !isValidObjectId(value) ) {
+      throw new BadRequestException(`${ value } is not a valid MongoID`);
     }
 
+    // The controller receives whatever transform returns.
+    // Here the id is already a string, so we pass it through unchanged.
     return value;
   }
+
+
 }

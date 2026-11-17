@@ -1,97 +1,62 @@
-import {
-  Body,
-  Controller,
-  Delete,
-  Get,
-  Param,
-  Patch,
-  Post,
-} from '@nestjs/common';
+// The controller is the HTTP layer. It does not query MongoDB.
+// It reads the already-validated request and calls PokemonService.
+//
+// With the prefix from main.ts, the routes are:
+//   POST   /api/v2/pokemon
+//   GET    /api/v2/pokemon
+//   GET    /api/v2/pokemon/:term
+//   PATCH  /api/v2/pokemon/:term
+//   DELETE /api/v2/pokemon/:id
+
+import { Controller, Get, Post, Body, Patch, Param, Delete, Query } from '@nestjs/common';
 import { PokemonService } from './pokemon.service';
 import { CreatePokemonDto } from './dto/create-pokemon.dto';
 import { UpdatePokemonDto } from './dto/update-pokemon.dto';
-import { ParseMongoIdPipe } from '../common/pipes/parse-mongo-id.pipe';
 
-/**
- * HTTP adapter for the Pokemon resource.
- *
- * `@Controller('pokemon')` sets this class's path segment. Combined with the
- * global prefix from `main.ts`, the routes below live under `/api/v2/pokemon`.
- *
- * The controller's job is to read the request and call the service. Business
- * rules and MongoDB access stay in `PokemonService`.
- *
- * Constructor injection: `private readonly pokemonService` tells Nest to
- * create a `PokemonService` (registered in `PokemonModule`) and assign it
- * to this property. `readonly` keeps the reference from being replaced.
- */
+import { ParseMongoIdPipe } from 'src/common/pipes/parse-mongo-id.pipe';
+import { PaginationDto } from 'src/common/dto/pagination.dto';
+
+// 'pokemon' is the path shared by every method in this class.
 @Controller('pokemon')
 export class PokemonController {
+  // Dependency injection. Nest sees PokemonService in the constructor,
+  // creates that service (or reuses the one it already created), and passes it in.
+  // private readonly stores the argument as a property and blocks reassignment.
   constructor(private readonly pokemonService: PokemonService) {}
 
-  /**
-   * `POST /api/v2/pokemon`
-   *
-   * `@Body()` is the JSON body, already checked by the global `ValidationPipe`
-   * against `CreatePokemonDto`. The parameter type is what tells the pipe
-   * which class to validate.
-   */
+  // POST /api/v2/pokemon
+  // @Body() is the JSON body. The global ValidationPipe has already
+  // checked it against CreatePokemonDto. If it was invalid, this method never runs.
   @Post()
   create(@Body() createPokemonDto: CreatePokemonDto) {
     return this.pokemonService.create(createPokemonDto);
   }
 
-  /**
-   * `GET /api/v2/pokemon`
-   *
-   * This route has no parameter, so it is the collection. Nest matches it
-   * separately from `GET /api/v2/pokemon/:term`.
-   */
+  // GET /api/v2/pokemon?limit=10&offset=0
+  // @Query() maps the query string onto PaginationDto.
   @Get()
-  findAll() {
-    return this.pokemonService.findAll();
+  findAll( @Query() paginationDto: PaginationDto ) {
+    return this.pokemonService.findAll( paginationDto );
   }
 
-  /**
-   * `GET /api/v2/pokemon/:term`
-   *
-   * `:term` is a path parameter. It may be a pokedex number, a MongoDB id,
-   * or a name. The service decides which one it is. No pipe is applied here,
-   * because a name or a number would be rejected by `ParseMongoIdPipe`.
-   *
-   * `@Param('term')` pulls that one segment out as a string.
-   */
+  // :term is a URL parameter. It may be a name, a Pokedex number, or a Mongo id.
+  // The service decides which of those it is.
   @Get(':term')
   findOne(@Param('term') term: string) {
-    return this.pokemonService.findOne(term);
+    return this.pokemonService.findOne( term );
   }
 
-  /**
-   * `PATCH /api/v2/pokemon/:term`
-   *
-   * The path identifies the document (number, id, or name). The body carries
-   * the fields to change and is validated as `UpdatePokemonDto`.
-   */
+  // PATCH updates only the fields present in the body.
+  // term works the same way as in findOne.
   @Patch(':term')
-  update(
-    @Param('term') term: string,
-    @Body() updatePokemonDto: UpdatePokemonDto,
-  ) {
-    return this.pokemonService.update(term, updatePokemonDto);
+  update(@Param('term') term: string, @Body() updatePokemonDto: UpdatePokemonDto) {
+    return this.pokemonService.update( term, updatePokemonDto);
   }
 
-  /**
-   * `DELETE /api/v2/pokemon/:id`
-   *
-   * Removal accepts only a MongoDB id. The parameter is named `id` to say so.
-   * The name is local to this method; the URL shape is still one segment,
-   * the same pattern as `:term` on the routes above.
-   *
-   * `ParseMongoIdPipe` runs on that segment before `remove` is called.
-   * An invalid id becomes a 400 and the service is not called.
-   */
+  // The second argument of @Param is a pipe. ParseMongoIdPipe runs
+  // before remove(), and rejects the request if :id is not a Mongo ObjectId.
   @Delete(':id')
-  remove(@Param('id', ParseMongoIdPipe) id: string) {
-    return this.pokemonService.remove(id);
+  remove(@Param('id', ParseMongoIdPipe ) id: string) {
+    return this.pokemonService.remove( id );
   }
 }

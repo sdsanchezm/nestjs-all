@@ -1,63 +1,46 @@
+// This file is the entry point. Node starts the process here
+// (see the "start" script in package.json). Nothing is listening
+// for HTTP requests until bootstrap() finishes.
+
 import { ValidationPipe } from '@nestjs/common';
 import { NestFactory } from '@nestjs/core';
-
 import { AppModule } from './app.module';
-import { port } from './common/imports/application.imports';
 
-/**
- * Boots the HTTP server.
- *
- * `async` lets us `await` Nest while it wires modules, connects to Mongo,
- * and binds the port. The function is called once, at the bottom of this file.
- */
+// async lets us use await. Creating the app and opening a port
+// are both operations that take time, so we wait for each one.
 async function bootstrap() {
-  /**
-   * `NestFactory.create` builds the application from the root module.
-   * `AppModule` is that root: every feature module hangs off its `imports`.
-   * The returned `app` is the handle for global settings and `listen`.
-   */
+  // NestFactory reads AppModule (and every module it imports),
+  // creates the controllers and services, and builds an HTTP server.
   const app = await NestFactory.create(AppModule);
 
-  /**
-   * Every controller path is prefixed with `api/v2`.
-   * `@Controller('pokemon')` therefore serves `/api/v2/pokemon`, not `/pokemon`.
-   * The prefix versions the API in one place, so controllers stay free of it.
-   */
+  // Prefix added in front of every controller path.
+  // @Controller('pokemon') is then reached at /api/v2/pokemon.
   app.setGlobalPrefix('api/v2');
 
-  /**
-   * A global pipe runs for every route handler argument (`@Body`, `@Param`, `@Query`).
-   * `ValidationPipe` reads the `class-validator` decorators on the DTO class
-   * declared as the argument type. Nest knows that class because TypeScript
-   * is compiled with `emitDecoratorMetadata`.
-   */
+  // A pipe runs on incoming data before a controller method sees it.
+  // useGlobalPipes installs this one on every route.
   app.useGlobalPipes(
     new ValidationPipe({
-      /**
-       * Drops properties that have no validation decorator.
-       * A field that is not on the DTO never reaches the service.
-       */
+      // Remove properties that the DTO class does not declare,
+      // so a client cannot save extra fields that we never asked for.
       whitelist: true,
-      /**
-       * Rejects the request with 400 when a property was going to be stripped.
-       * Callers learn about the unknown field instead of having it silently ignored.
-       */
+      // Reject the request (HTTP 400) when an unknown property is sent,
+      // instead of quietly dropping it.
       forbidNonWhitelisted: true,
-      /**
-       * Builds a real instance of the DTO class from the plain JSON object.
-       * The validators then run on that instance. This project has `class-transformer`
-       * installed, which is the library `transform` uses.
-       */
+      // Turn the plain JSON object into an instance of the DTO class
+      // (CreatePokemonDto, PaginationDto, ...). The validator needs that instance.
       transform: true,
-    }),
+      transformOptions: {
+        // Query strings arrive as text ("10"). This converts a value
+        // to the type written on the DTO (number) when the conversion is safe.
+        enableImplicitConversion: true,
+      }
+    })
   );
 
-  /**
-   * `port` reads `PORT` from the `ConfigService` that `ConfigModule` loaded
-   * from `.env`. The Mongo URL stays fixed in `AppModule`.
-   */
-  await app.listen(port(app));
-  console.log(`Application is running on: ${await app.getUrl()}`);
+  // Open port 3000 and keep the process running.
+  await app.listen(3000);
 }
 
+// Calling the function is what actually starts the server.
 bootstrap();
