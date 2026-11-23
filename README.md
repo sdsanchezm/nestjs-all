@@ -54,6 +54,14 @@ This file is the setup path. The other notes in this folder go further:
   - [Environment variables](#environment-variables)
   - [Error handling](#error-handling)
   - [API documentation](#api-documentation)
+- [12. PostgreSQL, step by step](#12-postgresql-step-by-step)
+  - [12.1 Run PostgreSQL](#121-run-postgresql)
+  - [12.2 Connection string](#122-connection-string)
+  - [12.3 Install the packages](#123-install-the-packages)
+  - [12.4 Register the connection](#124-register-the-connection)
+  - [12.5 Entity and feature module](#125-entity-and-feature-module)
+  - [12.6 Read and write a row](#126-read-and-write-a-row)
+  - [12.7 Confirm the row](#127-confirm-the-row)
 
 ## 1. Prerequisites
 
@@ -567,6 +575,8 @@ Swagger UI runs at `http://localhost:3000/api`.
 
 ### Database with TypeORM
 
+The short snippets below only install the driver. The full local setup — server, `.env`, entity, and a route that writes a row — is [section 12](#12-postgresql-step-by-step).
+
 PostgreSQL:
 
 ```bash
@@ -841,3 +851,240 @@ export class UsersController {
   }
 }
 ```
+
+## 12. PostgreSQL, step by step
+
+This walkthrough runs PostgreSQL on your machine and connects the Nest app with TypeORM. Do it from the project root, after the app from section 3 already starts.
+
+The same database works with Prisma. That client, the schema, and `prisma migrate dev` are in [MASTERING_NESTJS.md](MASTERING_NESTJS.md) under **Persistence: which ORM**.
+
+### 12.1 Run PostgreSQL
+
+Docker is the path that does not need a separate installer. From the project root, add `compose.yaml`:
+
+```yaml
+services:
+  db:
+    image: postgres:17
+    environment:
+      POSTGRES_USER: app
+      POSTGRES_PASSWORD: app
+      POSTGRES_DB: app
+    ports:
+      - "5432:5432"
+    volumes:
+      - pgdata:/var/lib/postgresql/data
+
+volumes:
+  pgdata:
+```
+
+compose for mongo:
+
+```yaml
+version: '3'
+
+services:
+  db:
+    image: mongo:5
+    restart: always
+    ports:
+      - 27017:27017
+    environment:
+      MONGODB_DATABASE: nest-pokemon
+    volumes:
+      - ./mongo:/data/db
+```
+
+Start it and wait until it accepts connections:
+
+```bash
+docker compose up -d
+docker compose exec db pg_isready -U app -d app
+```
+
+`pg_isready` prints `accepting connections` when the server is ready. The container creates the role `app`, the password `app`, and the database `app` on first start. Data stays in the `pgdata` volume across restarts.
+
+If PostgreSQL is already installed locally, create the same role and database instead of using Docker:
+
+```bash
+psql -U postgres -c "CREATE USER app WITH PASSWORD 'app';"
+psql -U postgres -c "CREATE DATABASE app OWNER app;"
+```
+
+Port `5432` must be free. A local server and this container cannot both bind it.
+
+### 12.2 Connection string
+
+Install config loading if it is not there yet (section 9), then add the URL to `.env` in the project root:
+
+```bash
+npm install @nestjs/config
+```
+
+```bash
+# .env
+DATABASE_URL=postgresql://app:app@localhost:5432/app
+```
+
+The starter `.gitignore` already ignores `.env`. The URL is only for this local role.
+
+### 12.3 Install the packages
+
+```bash
+npm install @nestjs/typeorm typeorm pg
+```
+
+`pg` is the PostgreSQL driver. TypeORM talks to it. `@nestjs/typeorm` registers that connection in the Nest module system.
+
+### 12.4 Register the connection
+
+`ConfigModule` has to load `.env` before TypeORM reads `DATABASE_URL`. In `src/app.module.ts`:
+
+```ts
+import { Module } from '@nestjs/common';
+import { ConfigModule, ConfigService } from '@nestjs/config';
+import { TypeOrmModule } from '@nestjs/typeorm';
+import { AppController } from './app.controller.js';
+import { AppService } from './app.service.js';
+import { UsersModule } from './modules/users/users.module.js';
+
+@Module({
+  imports: [
+    ConfigModule.forRoot({ isGlobal: true }),
+    TypeOrmModule.forRootAsync({
+      inject: [ConfigService],
+      useFactory: (config: ConfigService) => ({
+        type: 'postgres' as const,
+        url: config.getOrThrow<string>('DATABASE_URL'),
+        autoLoadEntities: true,
+        synchronize: true,
+      }),
+    }),
+    UsersModule,
+  ],
+  controllers: [AppController],
+  providers: [AppService],
+})
+export class AppModule {}
+```
+
+`autoLoadEntities` picks up every entity registered with `TypeOrmModule.forFeature`. `synchronize: true` creates and alters tables from those entities when the app boots. Leave that on only for this local database. A shared or production database uses migrations, and `synchronize` stays `false`. TypeORM will drop columns that no longer match the entity.
+
+### 12.5 Entity and feature module
+
+Generate the slice, then replace the files it wrote:
+
+```bash
+npx nest g module modules/users
+npx nest g service modules/users --no-spec
+npx nest g controller modules/users --no-spec
+```
+
+`src/modules/users/entities/user.entity.ts`:
+
+```ts
+import { Column, Entity, PrimaryGeneratedColumn } from 'typeorm';
+
+@Entity('users')
+export class User {
+  @PrimaryGeneratedColumn()
+  id: number;
+
+  @Column({ unique: true })
+  email: string;
+}
+```
+
+The table name is `users`. TypeORM's default name would be `user`, which is a reserved word in PostgreSQL.
+
+`src/modules/users/users.module.ts`:
+
+```ts
+import { Module } from '@nestjs/common';
+import { TypeOrmModule } from '@nestjs/typeorm';
+import { UsersController } from './users.controller.js';
+import { User } from './entities/user.entity.js';
+import { UsersService } from './users.service.js';
+
+@Module({
+  imports: [TypeOrmModule.forFeature([User])],
+  controllers: [UsersController],
+  providers: [UsersService],
+})
+export class UsersModule {}
+```
+
+`forFeature` registers `Repository<User>` in this module. `forRootAsync` in `AppModule` stays the only place that opens the connection.
+
+### 12.6 Read and write a row
+
+`src/modules/users/users.service.ts`:
+
+```ts
+import { Injectable } from '@nestjs/common';
+import { InjectRepository } from '@nestjs/typeorm';
+import { Repository } from 'typeorm';
+import { User } from './entities/user.entity.js';
+
+@Injectable()
+export class UsersService {
+  constructor(
+    @InjectRepository(User)
+    private readonly users: Repository<User>,
+  ) {}
+
+  create(email: string): Promise<User> {
+    return this.users.save(this.users.create({ email }));
+  }
+
+  findAll(): Promise<User[]> {
+    return this.users.find();
+  }
+}
+```
+
+`src/modules/users/users.controller.ts`:
+
+```ts
+import { Body, Controller, Get, Post } from '@nestjs/common';
+import { UsersService } from './users.service.js';
+
+@Controller('users')
+export class UsersController {
+  constructor(private readonly users: UsersService) {}
+
+  @Post()
+  create(@Body('email') email: string) {
+    return this.users.create(email);
+  }
+
+  @Get()
+  findAll() {
+    return this.users.findAll();
+  }
+}
+```
+
+### 12.7 Confirm the row
+
+```bash
+npm run start:dev
+```
+
+The log shows TypeORM connecting and creating `users`. A connection error here means the container is down, port `5432` is taken, or `DATABASE_URL` does not match the role and database from step 12.1.
+
+Insert a row and read it back:
+
+```bash
+curl -X POST http://localhost:3000/users -H "Content-Type: application/json" -d "{\"email\":\"ada@example.com\"}"
+curl http://localhost:3000/users
+```
+
+The same row is in PostgreSQL:
+
+```bash
+docker compose exec db psql -U app -d app -c "SELECT id, email FROM users;"
+```
+
+Stop the database with `docker compose stop`. `docker compose down -v` deletes the volume and the rows in it.
